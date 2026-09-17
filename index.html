@@ -45,9 +45,10 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .text-block blockquote{margin:12px 0;padding:10px 16px;background:var(--primary-soft);border-left:4px solid var(--primary);border-radius:0 8px 8px 0;color:var(--text)}
 
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
-.group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary)}
+.group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary);display:flex;align-items:center;justify-content:space-between}
+.group-title span{font-size:13px;color:var(--muted);font-weight:500}
 
-.subphotos{display:flex;flex-direction:column;gap:24px;width:100%}
+.subphotos{display:flex;flex-direction:column;gap:20px;width:100%}
 .photo{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.04);width:100%}
 .pic{width:100%;background:#edf2f5;display:block;cursor:zoom-in}
 .pic img{width:100% !important;height:auto !important;display:block;object-fit:contain;max-width:100%}
@@ -283,28 +284,43 @@ function renderPhotosGrid(files) {
     return;
   }
 
-  // 依照檔名排序
   files.sort((a, b) => a.name.localeCompare(b.name));
 
-  let html = '';
+  // 自動歸類：若檔名有 '-'，以 '-' 前面的文字當作區塊標題
+  const groupsMap = {};
   files.forEach(f => {
-    // 自動去除副檔名（如 .png, .jpg）當作區塊大標題
-    const titleName = f.name.replace(/\.[^/.]+$/, "");
-    const imgUrl = `https://lh3.googleusercontent.com/d/${f.id}=s0`;
+    const cleanName = f.name.replace(/\.[^/.]+$/, ""); // 去除副檔名 (.png, .jpg)
+    const groupKey = cleanName.includes('-') ? cleanName.split('-')[0].trim() : cleanName;
 
+    if (!groupsMap[groupKey]) groupsMap[groupKey] = [];
+    groupsMap[groupKey].push(f);
+  });
+
+  let html = '';
+  for (const [groupName, groupFiles] of Object.entries(groupsMap)) {
+    const photoCountText = groupFiles.length > 1 ? `<span>${groupFiles.length} 張照片</span>` : '';
+    
     html += `
       <article class="group">
-        <div class="group-title">${escapeHtml(titleName)}</div>
+        <div class="group-title">
+          <div>${escapeHtml(groupName)}</div>
+          ${photoCountText}
+        </div>
         <div class="subphotos">
-          <div class="photo">
-            <div class="pic" onclick="openLightbox('${imgUrl}')" title="點擊放大圖片">
-              <img src="${imgUrl}" alt="${escapeHtml(titleName)}" loading="lazy">
-            </div>
-          </div>
+          ${groupFiles.map(f => {
+            const imgUrl = `https://lh3.googleusercontent.com/d/${f.id}=s0`;
+            return `
+              <div class="photo">
+                <div class="pic" onclick="openLightbox('${imgUrl}')" title="點擊放大圖片">
+                  <img src="${imgUrl}" alt="${escapeHtml(f.name)}" loading="lazy">
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </article>
     `;
-  });
+  }
 
   document.getElementById('groups').innerHTML = html;
 }
