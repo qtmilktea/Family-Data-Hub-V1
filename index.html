@@ -114,15 +114,23 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 const CLIENT_ID = '1026711348381-9t8n7uc7uptia51fufiu4ar459dh7kk7.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
-// 在這裡設定資料選單名稱與 Google Drive Folder ID
 const dataFolders = [
   { id: 1, name: "資料 1 (01-6245)", folderId: "1LgmAybOd9cZuPMbqO1JghC2YNe2i0UDD" },
   { id: 2, name: "資料 2 (02-1809)", folderId: "1BSEm2XziaHu4RLknf6OCEB9vUCuaisZ9" }
 ];
 
 let tokenClient;
-let accessToken = null;
+let accessToken = sessionStorage.getItem('gdrive_token') || null;
 let selectedId = 1;
+
+function setAuthenticatedState(token) {
+  accessToken = token;
+  sessionStorage.setItem('gdrive_token', token); // 將 Token 存入暫存
+  document.getElementById('authOverlay').style.display = 'none';
+  const statusEl = document.getElementById('authStatus');
+  statusEl.textContent = '已連線';
+  statusEl.classList.add('online');
+}
 
 function initOAuth() {
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -130,16 +138,17 @@ function initOAuth() {
     scope: SCOPES,
     callback: (tokenResponse) => {
       if (tokenResponse.access_token) {
-        accessToken = tokenResponse.access_token;
-        document.getElementById('authOverlay').style.display = 'none';
-        const statusEl = document.getElementById('authStatus');
-        statusEl.textContent = '已連線';
-        statusEl.classList.add('online');
-        
+        setAuthenticatedState(tokenResponse.access_token);
         loadDrivePhotos();
       }
     },
   });
+
+  // 若 sessionStorage 內已有認證 Token，直接自動登入載入
+  if (accessToken) {
+    setAuthenticatedState(accessToken);
+    loadDrivePhotos();
+  }
 }
 
 window.onload = function() {
@@ -188,20 +197,26 @@ async function loadDrivePhotos() {
   tb.classList.add('empty');
 
   try {
-    // 查詢圖片與 txt 文字檔
     const q = `'${folder.folderId}' in parents and (mimeType contains 'image/' or mimeType = 'text/plain') and trashed = false`;
     const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&pageSize=100`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
+    
+    // 若 Token 過期（401 Unauthorized），清除快取並跳出登入視窗
+    if (res.status === 401) {
+      sessionStorage.removeItem('gdrive_token');
+      document.getElementById('authOverlay').style.display = 'flex';
+      return;
+    }
+
     const data = await res.json();
     const files = data.files || [];
 
-    // 搜尋 .txt 文字檔
     const txtFile = files.find(f => f.mimeType === 'text/plain');
     if (txtFile) {
       loadTxtContent(txtFile.id);
     } else {
-      tb.textContent = '此資料夾目前未設定說明檔（readme.txt）。';
+      tb.textContent = '此資料夾目前未設定說明檔。';
       tb.classList.add('empty');
     }
 
