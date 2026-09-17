@@ -33,7 +33,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .head{background:#fff;border:1px solid var(--border);border-radius:18px;padding:22px;margin-bottom:16px}
 .head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.head h2{margin:0 0 5px;font-size:22px}.head p{margin:0;color:var(--muted);font-size:13px}
 
-/* 文字區域 Markdown 排版樣式優化 */
+/* 文章區塊 Markdown 排版 */
 .text-block{background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:16px;line-height:1.75;font-size:15px;color:var(--text)}
 .text-block.empty{color:#9aa7b1;font-style:italic}
 .text-block h1,.text-block h2,.text-block h3{color:var(--primary);margin-top:1.2em;margin-bottom:0.6em;font-weight:700}
@@ -43,7 +43,6 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .text-block ul,.text-block ol{padding-left:20px;margin:0.5em 0}
 .text-block li{margin-bottom:4px}
 .text-block blockquote{margin:12px 0;padding:10px 16px;background:var(--primary-soft);border-left:4px solid var(--primary);border-radius:0 8px 8px 0;color:var(--text)}
-.text-block code{background:#f0f4f8;padding:2px 6px;border-radius:4px;font-size:0.9em}
 
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
 .group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary)}.group-title span{font-size:13px;color:var(--muted);font-weight:500;margin-left:6px}
@@ -52,7 +51,6 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .photo{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.04);width:100%}
 .pic{width:100%;background:#edf2f5;display:block;cursor:zoom-in}
 .pic img{width:100% !important;height:auto !important;display:block;object-fit:contain;max-width:100%}
-.label{padding:14px 18px;font-size:15px;font-weight:700;color:var(--text);border-top:1px solid var(--border);background:#fff}
 
 .footer{text-align:center;color:#8a9aa8;font-size:12px;padding:22px 14px 30px}
 
@@ -116,6 +114,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
       </div>
     </div>
 
+    <!-- TXT 內容區塊（可自訂文字與標題） -->
     <div id="textBlock" class="text-block empty">載入說明文字中...</div>
     <div id="groups" class="groups"></div>
   </section>
@@ -250,8 +249,7 @@ async function loadDrivePhotos() {
     if (txtFile) {
       loadTxtContent(txtFile.id);
     } else {
-      tb.innerHTML = '此資料夾目前未設定說明檔。';
-      tb.classList.add('empty');
+      tb.style.display = 'none'; // 如果沒有 TXT 檔則隱藏框框
     }
 
     const imgFiles = files.filter(f => f.mimeType.includes('image/'));
@@ -270,7 +268,7 @@ async function loadTxtContent(fileId) {
     const text = await res.text();
     const tb = document.getElementById('textBlock');
     
-    // 解析 Markdown 語法並渲染 HTML
+    tb.style.display = 'block';
     tb.innerHTML = marked.parse(text);
     tb.classList.remove('empty');
   } catch (e) {
@@ -288,10 +286,17 @@ function renderPhotosGrid(files) {
 
   files.sort((a, b) => a.name.localeCompare(b.name));
 
+  // 自動解析標題：若包含 '-' 則取前段，若無則拿檔名去除 .png 格式
   const groupsMap = {};
   files.forEach(f => {
     const parts = f.name.split('-');
-    const groupKey = parts.length >= 3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : '其他項目';
+    let groupKey = '';
+    if (parts.length >= 3) {
+      groupKey = `${parts[0]}-${parts[1]}-${parts[2]}`;
+    } else {
+      groupKey = f.name.replace(/\.[^/.]+$/, ""); // 直接使用檔名當作群組大標題
+    }
+
     if (!groupsMap[groupKey]) groupsMap[groupKey] = [];
     groupsMap[groupKey].push(f);
   });
@@ -300,7 +305,7 @@ function renderPhotosGrid(files) {
   for (const [groupName, groupFiles] of Object.entries(groupsMap)) {
     html += `
       <article class="group">
-        <div class="group-title">${escapeHtml(groupName)} <span>${groupFiles.length} 張照片</span></div>
+        <div class="group-title">${escapeHtml(groupName)}</div>
         <div class="subphotos">
           ${groupFiles.map(f => {
             const imgUrl = `https://lh3.googleusercontent.com/d/${f.id}=s0`;
@@ -309,7 +314,7 @@ function renderPhotosGrid(files) {
                 <div class="pic" onclick="openLightbox('${imgUrl}')" title="點擊放大圖片">
                   <img src="${imgUrl}" alt="${escapeHtml(f.name)}" loading="lazy">
                 </div>
-                <div class="label">${escapeHtml(f.name)}</div>
+                <!-- 這裡已移除檔名標籤，只呈現簡潔圖框 -->
               </div>
             `;
           }).join('')}
@@ -327,7 +332,7 @@ function openLightbox(url) {
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('show');
+  document.getElementById('lightbox].classList.remove('show');
 }
 
 function escapeHtml(s) {
