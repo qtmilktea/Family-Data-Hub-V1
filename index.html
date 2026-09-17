@@ -17,12 +17,14 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .top{height:66px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:20}
 .brand{font-weight:800;color:var(--primary);display:flex;gap:9px;align-items:center}.brand-icon{font-size:23px}
 .actions{display:flex;gap:8px;align-items:center}.private{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 13px;color:var(--text);font-size:13px}
+.edit-btn{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 13px;color:var(--primary);font-weight:700;font-size:13px}.edit-btn:hover{background:var(--primary-soft)}
 .auth-status{font-size:13px;padding:6px 12px;border-radius:999px;background:#f0f4f8;color:var(--muted);font-weight:600}
 .auth-status.online{background:#e8f8f0;color:#1e7e48}
 
 .layout{max-width:1400px;margin:auto;padding:22px;display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px}
 .side{background:#fff;border:1px solid var(--border);border-radius:18px;padding:12px;height:calc(100vh - 110px);position:sticky;top:88px;overflow:auto}
 .side-head{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 12px}.side h3{margin:0;font-size:16px}
+.small-btn{border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 10px;color:var(--primary);font-size:12px;font-weight:700}
 .list{display:flex;flex-direction:column;gap:5px}.item{width:100%;text-align:left;border:0;background:transparent;border-radius:11px;padding:11px 12px;color:var(--text)}
 .item:hover{background:#f3f7fa}.item.active{background:var(--primary-soft);color:var(--primary);font-weight:800}
 .mobile{display:none;width:100%;padding:11px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-bottom:14px;color:var(--text)}
@@ -35,7 +37,6 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
 .group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary)}.group-title span{font-size:13px;color:var(--muted);font-weight:500;margin-left:6px}
 
-/* 大圖排列設定：100% 填滿全寬 */
 .subphotos{display:flex;flex-direction:column;gap:24px;width:100%}
 .photo{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.04);width:100%}
 .pic{width:100%;background:#edf2f5;display:block;cursor:zoom-in}
@@ -50,15 +51,22 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .auth-box h2{margin:0 0 10px;color:var(--text)}.auth-box p{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.6}
 .auth-btn{background:var(--primary);color:#fff;border:0;border-radius:12px;padding:12px 24px;font-weight:700;font-size:15px;width:100%}
 
-/* 全螢幕燈箱 (Lightbox) */
+/* 燈箱 */
 .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
 .lightbox.show{display:flex}
 .lightbox img{max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 
+/* modal 彈窗 */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(20,35,45,.42);z-index:100;align-items:center;justify-content:center;padding:16px}
+.modal-backdrop.show{display:flex}.modal{background:#fff;width:min(760px,100%);max-height:90vh;overflow:auto;border-radius:20px;padding:22px;box-shadow:var(--shadow)}
+.modal h2{margin:0 0 6px}.modal-desc{margin:0 0 18px;color:var(--muted);font-size:13px}
+.rich-text{min-height:200px;max-height:45vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:14px;line-height:1.8;background:#fff;outline:none}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border);padding-top:15px;margin-top:15px}
+.cancel{border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 16px}.save{border:0;background:var(--primary);color:#fff;border-radius:10px;padding:10px 18px;font-weight:800}
+
 @media(max-width:800px){
   .layout{grid-template-columns:1fr;padding:10px}.side{display:none}.mobile{display:block}
-  .top{padding:0 14px}
-  .group{padding:12px}
+  .top{padding:0 14px}.group{padding:12px}
 }
 </style>
 </head>
@@ -74,7 +82,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
   </div>
 </div>
 
-<!-- 全螢幕看大圖燈箱 -->
+<!-- 全螢幕燈箱 -->
 <div id="lightbox" class="lightbox" onclick="closeLightbox()">
   <img id="lightboxImg" src="" alt="大圖檢視">
 </div>
@@ -104,6 +112,9 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
           <h2 id="title">載入中...</h2>
           <p id="subtitle">請稍候</p>
         </div>
+        <div class="section-actions">
+          <button class="edit-btn" onclick="openTextEditor()">✎ 編輯說明文字</button>
+        </div>
       </div>
     </div>
 
@@ -112,12 +123,26 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
   </section>
 </main>
 
-<footer class="footer">Family Data Hub｜GitHub 網頁介面 V6</footer>
+<footer class="footer">Family Data Hub｜GitHub 網頁介面 V7</footer>
+
+<!-- 編輯文字彈窗 -->
+<div id="textModal" class="modal-backdrop">
+  <div class="modal">
+    <h2>編輯資料說明</h2>
+    <p class="modal-desc">此說明文字會儲存在當前瀏覽器中，適用於備註與分析說明。</p>
+    <div id="textInput" class="rich-text" contenteditable="true" role="textbox" aria-multiline="true"></div>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeModals()">取消</button>
+      <button class="save" onclick="saveText()">儲存</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const CLIENT_ID = '1026711348381-9t8n7uc7uptia51fufiu4ar459dh7kk7.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
+// 在這裡修改「左側選單的資料夾名稱」與對應的「Google Drive 資料夾 ID」
 const dataFolders = [
   { id: 1, name: "資料 1 (01-6245)", folderId: "1LgmAybOd9cZuPMbqO1JghC2YNe2i0UDD" },
   { id: 2, name: "資料 2 (02-1809)", folderId: "1BSEm2XziaHu4RLknf6OCEB9vUCuaisZ9" }
@@ -126,6 +151,7 @@ const dataFolders = [
 let tokenClient;
 let accessToken = null;
 let selectedId = 1;
+let textData = JSON.parse(localStorage.getItem('familyHubTexts') || '{}');
 
 function initOAuth() {
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -173,9 +199,33 @@ function renderSidebar() {
 function selectData(id) {
   selectedId = id;
   renderSidebar();
+  renderTextBlock();
   if (accessToken) {
     loadDrivePhotos();
   }
+}
+
+function renderTextBlock() {
+  const tb = document.getElementById('textBlock');
+  const text = textData[selectedId] || '';
+  tb.innerHTML = text || '點擊右上角「✎ 編輯說明文字」可新增本筆資料的說明或備註。';
+  tb.classList.toggle('empty', !text);
+}
+
+function openTextEditor() {
+  document.getElementById('textInput').innerHTML = textData[selectedId] || '';
+  document.getElementById('textModal').classList.add('show');
+}
+
+function saveText() {
+  textData[selectedId] = document.getElementById('textInput').innerHTML;
+  localStorage.setItem('familyHubTexts', JSON.stringify(textData));
+  closeModals();
+  renderTextBlock();
+}
+
+function closeModals() {
+  document.querySelectorAll('.modal-backdrop').forEach(x => x.classList.remove('show'));
 }
 
 async function loadDrivePhotos() {
@@ -185,6 +235,8 @@ async function loadDrivePhotos() {
   document.getElementById('title').textContent = folder.name;
   document.getElementById('subtitle').textContent = "讀取 Google Drive 中...";
   document.getElementById('groups').innerHTML = "<div style='text-align:center;padding:40px;color:var(--muted)'>正在從雲端取得照片...</div>";
+
+  renderTextBlock();
 
   try {
     const q = `'${folder.folderId}' in parents and mimeType contains 'image/' and trashed = false`;
@@ -226,7 +278,6 @@ function renderPhotosGrid(files) {
         <div class="group-title">${escapeHtml(groupName)} <span>${groupFiles.length} 張照片</span></div>
         <div class="subphotos">
           ${groupFiles.map(f => {
-            // 使用 =s0 載入最高解析度的原圖
             const imgUrl = `https://lh3.googleusercontent.com/d/${f.id}=s0`;
             return `
               <div class="photo">
