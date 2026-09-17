@@ -6,6 +6,9 @@
 <title>Family Data Hub</title>
 <!-- 載入 Google 官方 API 腳本 -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- 載入 Markdown 解析器 -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 <style>
 :root{
   --primary:#477aa3;--primary-soft:#edf5fa;--text:#263746;--muted:#7a8996;
@@ -29,8 +32,18 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 
 .head{background:#fff;border:1px solid var(--border);border-radius:18px;padding:22px;margin-bottom:16px}
 .head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.head h2{margin:0 0 5px;font-size:22px}.head p{margin:0;color:var(--muted);font-size:13px}
-.text-block{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:16px;white-space:pre-wrap;line-height:1.8;font-size:15px;min-height:60px}
+
+/* 文字區域 Markdown 排版樣式優化 */
+.text-block{background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:16px;line-height:1.75;font-size:15px;color:var(--text)}
 .text-block.empty{color:#9aa7b1;font-style:italic}
+.text-block h1,.text-block h2,.text-block h3{color:var(--primary);margin-top:1.2em;margin-bottom:0.6em;font-weight:700}
+.text-block h1{font-size:1.4em;border-bottom:1px solid var(--border);padding-bottom:6px}
+.text-block h2{font-size:1.2em}
+.text-block p{margin:0.5em 0}
+.text-block ul,.text-block ol{padding-left:20px;margin:0.5em 0}
+.text-block li{margin-bottom:4px}
+.text-block blockquote{margin:12px 0;padding:10px 16px;background:var(--primary-soft);border-left:4px solid var(--primary);border-radius:0 8px 8px 0;color:var(--text)}
+.text-block code{background:#f0f4f8;padding:2px 6px;border-radius:4px;font-size:0.9em}
 
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
 .group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary)}.group-title span{font-size:13px;color:var(--muted);font-weight:500;margin-left:6px}
@@ -115,8 +128,8 @@ const CLIENT_ID = '1026711348381-9t8n7uc7uptia51fufiu4ar459dh7kk7.apps.googleuse
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
 const dataFolders = [
-  { id: 1, name: "資料 1 (01-6245)", folderId: "1LgmAybOd9cZuPMbqO1JghC2YNe2i0UDD" },
-  { id: 2, name: "資料 2 (02-1809)", folderId: "1BSEm2XziaHu4RLknf6OCEB9vUCuaisZ9" }
+  { id: 1, name: "載入中...", folderId: "1LgmAybOd9cZuPMbqO1JghC2YNe2i0UDD" },
+  { id: 2, name: "載入中...", folderId: "1BSEm2XziaHu4RLknf6OCEB9vUCuaisZ9" }
 ];
 
 let tokenClient;
@@ -125,7 +138,7 @@ let selectedId = 1;
 
 function setAuthenticatedState(token) {
   accessToken = token;
-  sessionStorage.setItem('gdrive_token', token); // 將 Token 存入暫存
+  sessionStorage.setItem('gdrive_token', token);
   document.getElementById('authOverlay').style.display = 'none';
   const statusEl = document.getElementById('authStatus');
   statusEl.textContent = '已連線';
@@ -139,15 +152,14 @@ function initOAuth() {
     callback: (tokenResponse) => {
       if (tokenResponse.access_token) {
         setAuthenticatedState(tokenResponse.access_token);
-        loadDrivePhotos();
+        fetchFolderNamesAndLoad();
       }
     },
   });
 
-  // 若 sessionStorage 內已有認證 Token，直接自動登入載入
   if (accessToken) {
     setAuthenticatedState(accessToken);
-    loadDrivePhotos();
+    fetchFolderNamesAndLoad();
   }
 }
 
@@ -165,6 +177,29 @@ function handleAuthClick() {
   if (tokenClient) {
     tokenClient.requestAccessToken();
   }
+}
+
+async function fetchFolderNamesAndLoad() {
+  for (let folder of dataFolders) {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folder.folderId}?fields=name`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem('gdrive_token');
+        document.getElementById('authOverlay').style.display = 'flex';
+        return;
+      }
+      const data = await res.json();
+      if (data.name) {
+        folder.name = data.name;
+      }
+    } catch (e) {
+      console.error("無法取得資料夾名稱", e);
+    }
+  }
+  renderSidebar();
+  loadDrivePhotos();
 }
 
 function renderSidebar() {
@@ -193,7 +228,7 @@ async function loadDrivePhotos() {
   document.getElementById('groups').innerHTML = "<div style='text-align:center;padding:40px;color:var(--muted)'>正在從雲端取得照片...</div>";
 
   const tb = document.getElementById('textBlock');
-  tb.textContent = '讀取雲端說明中...';
+  tb.innerHTML = '讀取雲端說明中...';
   tb.classList.add('empty');
 
   try {
@@ -202,7 +237,6 @@ async function loadDrivePhotos() {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
     
-    // 若 Token 過期（401 Unauthorized），清除快取並跳出登入視窗
     if (res.status === 401) {
       sessionStorage.removeItem('gdrive_token');
       document.getElementById('authOverlay').style.display = 'flex';
@@ -216,7 +250,7 @@ async function loadDrivePhotos() {
     if (txtFile) {
       loadTxtContent(txtFile.id);
     } else {
-      tb.textContent = '此資料夾目前未設定說明檔。';
+      tb.innerHTML = '此資料夾目前未設定說明檔。';
       tb.classList.add('empty');
     }
 
@@ -235,7 +269,9 @@ async function loadTxtContent(fileId) {
     });
     const text = await res.text();
     const tb = document.getElementById('textBlock');
-    tb.textContent = text;
+    
+    // 解析 Markdown 語法並渲染 HTML
+    tb.innerHTML = marked.parse(text);
     tb.classList.remove('empty');
   } catch (e) {
     console.error("無法讀取說明檔", e);
