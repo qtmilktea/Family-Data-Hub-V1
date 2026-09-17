@@ -35,7 +35,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 
 /* 文章區塊 Markdown 排版 */
 .text-block{background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:16px;line-height:1.75;font-size:15px;color:var(--text)}
-.text-block.empty{color:#9aa7b1;font-style:italic}
+.text-block.empty{display:none}
 .text-block h1,.text-block h2,.text-block h3{color:var(--primary);margin-top:1.2em;margin-bottom:0.6em;font-weight:700}
 .text-block h1{font-size:1.4em;border-bottom:1px solid var(--border);padding-bottom:6px}
 .text-block h2{font-size:1.2em}
@@ -45,7 +45,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 .text-block blockquote{margin:12px 0;padding:10px 16px;background:var(--primary-soft);border-left:4px solid var(--primary);border-radius:0 8px 8px 0;color:var(--text)}
 
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
-.group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary)}.group-title span{font-size:13px;color:var(--muted);font-weight:500;margin-left:6px}
+.group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary)}
 
 .subphotos{display:flex;flex-direction:column;gap:24px;width:100%}
 .photo{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.04);width:100%}
@@ -114,8 +114,8 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
       </div>
     </div>
 
-    <!-- TXT 內容區塊（可自訂文字與標題） -->
-    <div id="textBlock" class="text-block empty">載入說明文字中...</div>
+    <!-- TXT 說明備註區 -->
+    <div id="textBlock" class="text-block empty"></div>
     <div id="groups" class="groups"></div>
   </section>
 </main>
@@ -227,8 +227,7 @@ async function loadDrivePhotos() {
   document.getElementById('groups').innerHTML = "<div style='text-align:center;padding:40px;color:var(--muted)'>正在從雲端取得照片...</div>";
 
   const tb = document.getElementById('textBlock');
-  tb.innerHTML = '讀取雲端說明中...';
-  tb.classList.add('empty');
+  tb.style.display = 'none';
 
   try {
     const q = `'${folder.folderId}' in parents and (mimeType contains 'image/' or mimeType = 'text/plain') and trashed = false`;
@@ -248,8 +247,6 @@ async function loadDrivePhotos() {
     const txtFile = files.find(f => f.mimeType === 'text/plain');
     if (txtFile) {
       loadTxtContent(txtFile.id);
-    } else {
-      tb.style.display = 'none'; // 如果沒有 TXT 檔則隱藏框框
     }
 
     const imgFiles = files.filter(f => f.mimeType.includes('image/'));
@@ -268,9 +265,11 @@ async function loadTxtContent(fileId) {
     const text = await res.text();
     const tb = document.getElementById('textBlock');
     
-    tb.style.display = 'block';
-    tb.innerHTML = marked.parse(text);
-    tb.classList.remove('empty');
+    if (text.trim() !== "") {
+      tb.style.display = 'block';
+      tb.innerHTML = marked.parse(text);
+      tb.classList.remove('empty');
+    }
   } catch (e) {
     console.error("無法讀取說明檔", e);
   }
@@ -284,44 +283,28 @@ function renderPhotosGrid(files) {
     return;
   }
 
+  // 依照檔名排序
   files.sort((a, b) => a.name.localeCompare(b.name));
 
-  // 自動解析標題：若包含 '-' 則取前段，若無則拿檔名去除 .png 格式
-  const groupsMap = {};
-  files.forEach(f => {
-    const parts = f.name.split('-');
-    let groupKey = '';
-    if (parts.length >= 3) {
-      groupKey = `${parts[0]}-${parts[1]}-${parts[2]}`;
-    } else {
-      groupKey = f.name.replace(/\.[^/.]+$/, ""); // 直接使用檔名當作群組大標題
-    }
-
-    if (!groupsMap[groupKey]) groupsMap[groupKey] = [];
-    groupsMap[groupKey].push(f);
-  });
-
   let html = '';
-  for (const [groupName, groupFiles] of Object.entries(groupsMap)) {
+  files.forEach(f => {
+    // 自動去除副檔名（如 .png, .jpg）當作區塊大標題
+    const titleName = f.name.replace(/\.[^/.]+$/, "");
+    const imgUrl = `https://lh3.googleusercontent.com/d/${f.id}=s0`;
+
     html += `
       <article class="group">
-        <div class="group-title">${escapeHtml(groupName)}</div>
+        <div class="group-title">${escapeHtml(titleName)}</div>
         <div class="subphotos">
-          ${groupFiles.map(f => {
-            const imgUrl = `https://lh3.googleusercontent.com/d/${f.id}=s0`;
-            return `
-              <div class="photo">
-                <div class="pic" onclick="openLightbox('${imgUrl}')" title="點擊放大圖片">
-                  <img src="${imgUrl}" alt="${escapeHtml(f.name)}" loading="lazy">
-                </div>
-                <!-- 這裡已移除檔名標籤，只呈現簡潔圖框 -->
-              </div>
-            `;
-          }).join('')}
+          <div class="photo">
+            <div class="pic" onclick="openLightbox('${imgUrl}')" title="點擊放大圖片">
+              <img src="${imgUrl}" alt="${escapeHtml(titleName)}" loading="lazy">
+            </div>
+          </div>
         </div>
       </article>
     `;
-  }
+  });
 
   document.getElementById('groups').innerHTML = html;
 }
@@ -332,7 +315,7 @@ function openLightbox(url) {
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox].classList.remove('show');
+  document.getElementById('lightbox').classList.remove('show');
 }
 
 function escapeHtml(s) {
