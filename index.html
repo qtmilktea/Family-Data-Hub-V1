@@ -104,7 +104,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
   </aside>
 
   <section>
-    <select id="mobile" class="mobile" aria-label="選擇資料" onchange="selectData(Number(this.value))"></select>
+    <select id="mobile" class="mobile" aria-label="選擇資料" onchange="selectData(this.value)"></select>
 
     <div class="head">
       <div class="head-row">
@@ -127,14 +127,13 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 const CLIENT_ID = '1026711348381-9t8n7uc7uptia51fufiu4ar459dh7kk7.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
-const dataFolders = [
-  { id: 1, name: "載入中...", folderId: "1LgmAybOd9cZuPMbqO1JghC2YNe2i0UDD" },
-  { id: 2, name: "載入中...", folderId: "1BSEm2XziaHu4RLknf6OCEB9vUCuaisZ9" }
-];
+// 已更新為你的總母資料夾 ID
+const PARENT_FOLDER_ID = '1hueDTgwGrUwV5TbnUPQ1jKUIAtPToOFk';
 
 let tokenClient;
 let accessToken = sessionStorage.getItem('gdrive_token') || null;
-let selectedId = 1;
+let dataFolders = [];
+let selectedFolderId = null;
 
 function setAuthenticatedState(token) {
   accessToken = token;
@@ -152,19 +151,18 @@ function initOAuth() {
     callback: (tokenResponse) => {
       if (tokenResponse.access_token) {
         setAuthenticatedState(tokenResponse.access_token);
-        fetchFolderNamesAndLoad();
+        fetchSubFolders();
       }
     },
   });
 
   if (accessToken) {
     setAuthenticatedState(accessToken);
-    fetchFolderNamesAndLoad();
+    fetchSubFolders();
   }
 }
 
 window.onload = function() {
-  renderSidebar();
   let checkGapi = setInterval(() => {
     if (window.google && google.accounts) {
       clearInterval(checkGapi);
@@ -179,40 +177,51 @@ function handleAuthClick() {
   }
 }
 
-async function fetchFolderNamesAndLoad() {
-  for (let folder of dataFolders) {
-    try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folder.folderId}?fields=name`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (res.status === 401) {
-        sessionStorage.removeItem('gdrive_token');
-        document.getElementById('authOverlay').style.display = 'flex';
-        return;
-      }
-      const data = await res.json();
-      if (data.name) {
-        folder.name = data.name;
-      }
-    } catch (e) {
-      console.error("無法取得資料夾名稱", e);
+async function fetchSubFolders() {
+  try {
+    const q = `'${PARENT_FOLDER_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    
+    if (res.status === 401) {
+      sessionStorage.removeItem('gdrive_token');
+      document.getElementById('authOverlay').style.display = 'flex';
+      return;
     }
+
+    const data = await res.json();
+    dataFolders = data.files || [];
+    
+    dataFolders.sort((a, b) => a.name.localeCompare(b.name));
+
+    if (dataFolders.length > 0) {
+      if (!selectedFolderId || !dataFolders.some(x => x.id === selectedFolderId)) {
+        selectedFolderId = dataFolders[0].id;
+      }
+      renderSidebar();
+      loadDrivePhotos();
+    } else {
+      document.getElementById('title').textContent = "未找到資料夾";
+      document.getElementById('subtitle').textContent = "請確認總資料夾內是否有子資料夾";
+      document.getElementById('groups').innerHTML = "";
+    }
+  } catch (e) {
+    console.error("無法取得資料夾清單", e);
   }
-  renderSidebar();
-  loadDrivePhotos();
 }
 
 function renderSidebar() {
   document.getElementById('list').innerHTML = dataFolders.map(x => `
-    <button class="item ${x.id === selectedId ? 'active' : ''}" onclick="selectData(${x.id})">${escapeHtml(x.name)}</button>
+    <button class="item ${x.id === selectedFolderId ? 'active' : ''}" onclick="selectData('${x.id}')">${escapeHtml(x.name)}</button>
   `).join('');
   document.getElementById('mobile').innerHTML = dataFolders.map(x => `
-    <option value="${x.id}" ${x.id === selectedId ? 'selected' : ''}>${escapeHtml(x.name)}</option>
+    <option value="${x.id}" ${x.id === selectedFolderId ? 'selected' : ''}>${escapeHtml(x.name)}</option>
   `).join('');
 }
 
-function selectData(id) {
-  selectedId = id;
+function selectData(folderId) {
+  selectedFolderId = folderId;
   renderSidebar();
   if (accessToken) {
     loadDrivePhotos();
@@ -220,7 +229,7 @@ function selectData(id) {
 }
 
 async function loadDrivePhotos() {
-  const folder = dataFolders.find(x => x.id === selectedId);
+  const folder = dataFolders.find(x => x.id === selectedFolderId);
   if (!folder) return;
 
   document.getElementById('title').textContent = folder.name;
@@ -231,7 +240,7 @@ async function loadDrivePhotos() {
   tb.style.display = 'none';
 
   try {
-    const q = `'${folder.folderId}' in parents and (mimeType contains 'image/' or mimeType = 'text/plain') and trashed = false`;
+    const q = `'${folder.id}' in parents and (mimeType contains 'image/' or mimeType = 'text/plain') and trashed = false`;
     const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&pageSize=100`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
@@ -286,10 +295,9 @@ function renderPhotosGrid(files) {
 
   files.sort((a, b) => a.name.localeCompare(b.name));
 
-  // 自動歸類：若檔名有 '-'，以 '-' 前面的文字當作區塊標題
   const groupsMap = {};
   files.forEach(f => {
-    const cleanName = f.name.replace(/\.[^/.]+$/, ""); // 去除副檔名 (.png, .jpg)
+    const cleanName = f.name.replace(/\.[^/.]+$/, "");
     const groupKey = cleanName.includes('-') ? cleanName.split('-')[0].trim() : cleanName;
 
     if (!groupsMap[groupKey]) groupsMap[groupKey] = [];
