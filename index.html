@@ -246,7 +246,7 @@ async function fetchSubFolders() {
     const data = await res.json();
     dataFolders = data.files || [];
     
-    dataFolders.sort((a, b) => a.name.localeCompare(b.name));
+    dataFolders.sort((a, b) => naturalSort(a.name, b.name));
 
     if (dataFolders.length > 0) {
       if (!selectedFolderId || !dataFolders.some(x => x.id === selectedFolderId)) {
@@ -346,7 +346,7 @@ function renderPhotosGrid(files) {
     return;
   }
 
-  files.sort((a, b) => a.name.localeCompare(b.name));
+  files.sort((a, b) => naturalSort(a.name, b.name));
 
   const groupsMap = {};
   files.forEach(f => {
@@ -384,6 +384,34 @@ function renderPhotosGrid(files) {
   }
 
   document.getElementById('groups').innerHTML = html;
+}
+
+// 自然數字排序：01、02、...、09、010、011、012...
+// 同時支援像 01-6、02-1 這類名稱。
+function naturalSort(a, b) {
+  const partsA = String(a).match(/\\d+|\\D+/g) || [];
+  const partsB = String(b).match(/\\d+|\\D+/g) || [];
+  const len = Math.min(partsA.length, partsB.length);
+
+  for (let i = 0; i < len; i++) {
+    const pa = partsA[i];
+    const pb = partsB[i];
+    const na = /^\\d+$/.test(pa);
+    const nb = /^\\d+$/.test(pb);
+
+    if (na && nb) {
+      const diff = Number(pa) - Number(pb);
+      if (diff !== 0) return diff;
+    } else {
+      const diff = pa.localeCompare(pb, 'zh-Hant', {
+        sensitivity: 'base',
+        numeric: false
+      });
+      if (diff !== 0) return diff;
+    }
+  }
+
+  return partsA.length - partsB.length;
 }
 
 function openLightbox(url) {
