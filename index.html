@@ -391,15 +391,15 @@ function renderPhotosGrid(files) {
 // 自然數字排序：01、02、...、09、010、011、012...
 // 同時支援像 01-6、02-1 這類名稱。
 function naturalSort(a, b) {
-  const partsA = String(a).match(/\\d+|\\D+/g) || [];
-  const partsB = String(b).match(/\\d+|\\D+/g) || [];
+  const partsA = String(a).match(/\d+|\D+/g) || [];
+  const partsB = String(b).match(/\d+|\D+/g) || [];
   const len = Math.min(partsA.length, partsB.length);
 
   for (let i = 0; i < len; i++) {
     const pa = partsA[i];
     const pb = partsB[i];
-    const na = /^\\d+$/.test(pa);
-    const nb = /^\\d+$/.test(pb);
+    const na = /^\d+$/.test(pa);
+    const nb = /^\d+$/.test(pb);
 
     if (na && nb) {
       const diff = Number(pa) - Number(pb);
