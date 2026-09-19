@@ -358,7 +358,9 @@ function renderPhotosGrid(files) {
   });
 
   let html = '';
-  for (const [groupName, groupFiles] of Object.entries(groupsMap)) {
+  // 依照群組名稱重新排序，確保 01 一定在 011 前面
+  const sortedGroups = Object.entries(groupsMap).sort((a, b) => naturalSort(a[0], b[0]));
+  for (const [groupName, groupFiles] of sortedGroups) {
     const photoCountText = groupFiles.length > 1 ? `<span>${groupFiles.length} 張照片</span>` : '';
     
     html += `
