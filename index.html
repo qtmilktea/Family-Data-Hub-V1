@@ -15,7 +15,7 @@
   --border:#dce5eb;--bg:#f5f8fa;--card:#fff;--danger:#b54b4b;--shadow:0 10px 30px rgba(38,55,70,.10)
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth} /* 啟用平滑滾動效果 */
+html{scroll-behavior:smooth}
 html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans TC",sans-serif;color:var(--text);background:var(--bg)}
 button,input,textarea,select{font:inherit} button{cursor:pointer}
 .top{height:66px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:20}
@@ -47,7 +47,21 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
 .group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary);display:flex;align-items:center;justify-content:space-between}
+.group-title-left { display: flex; align-items: center; gap: 10px; }
 .group-title span{font-size:13px;color:var(--muted);font-weight:500}
+
+/* NEW 標籤樣式 */
+.badge-new {
+  background: #e53e3e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  vertical-align: middle;
+}
 
 .subphotos{display:flex;flex-direction:column;gap:20px;width:100%}
 .photo{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.04);width:100%}
@@ -56,7 +70,7 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 
 .footer{text-align:center;color:#8a9aa8;font-size:12px;padding:22px 14px 30px}
 
-/* 🚀 回到最上方按鈕樣式 */
+/* 回到最上方按鈕樣式 */
 .back-to-top {
   position: fixed;
   bottom: 30px;
@@ -120,7 +134,6 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
   <img id="lightboxImg" src="" alt="大圖檢視">
 </div>
 
-<!-- 🚀 回到最上方按鈕元素 -->
 <button id="backToTopBtn" class="back-to-top" onclick="scrollToTop()" title="回到最上方">▲</button>
 
 <header class="top">
@@ -162,7 +175,6 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 <script>
 const CLIENT_ID = '1026711348381-9t8n7uc7uptia51fufiu4ar459dh7kk7.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
-
 const PARENT_FOLDER_ID = '1hueDTgwGrUwV5TbnUPQ1jKUIAtPToOFk';
 
 let tokenClient;
@@ -198,14 +210,14 @@ function initOAuth() {
 }
 
 window.onload = function() {
+  // 完整等待 google.accounts.oauth2 載入完成
   let checkGapi = setInterval(() => {
-    if (window.google && google.accounts) {
+    if (window.google && google.accounts && google.accounts.oauth2) {
       clearInterval(checkGapi);
       initOAuth();
     }
   }, 100);
 
-  // 監聽視窗捲動，控制按鈕顯示與隱藏
   window.addEventListener('scroll', function() {
     const btn = document.getElementById('backToTopBtn');
     if (window.scrollY > 300) {
@@ -222,7 +234,6 @@ function handleAuthClick() {
   }
 }
 
-// 點擊按鈕後平滑滾動回頂部
 function scrollToTop() {
   window.scrollTo({
     top: 0,
@@ -246,7 +257,8 @@ async function fetchSubFolders() {
     const data = await res.json();
     dataFolders = data.files || [];
     
-    dataFolders.sort((a, b) => naturalSort(a.name, b.name));
+    // 自然數字排序資料夾清單
+    dataFolders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
     if (dataFolders.length > 0) {
       if (!selectedFolderId || !dataFolders.some(x => x.id === selectedFolderId)) {
@@ -294,7 +306,7 @@ async function loadDrivePhotos() {
 
   try {
     const q = `'${folder.id}' in parents and (mimeType contains 'image/' or mimeType = 'text/plain') and trashed = false`;
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&pageSize=100`, {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime)&pageSize=100`, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
     
@@ -346,27 +358,44 @@ function renderPhotosGrid(files) {
     return;
   }
 
-  files.sort((a, b) => naturalSort(a.name, b.name));
+  // 套用自然數字排序 (01, 02... 10, 11)
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   const groupsMap = {};
+  const now = new Date();
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
   files.forEach(f => {
     const cleanName = f.name.replace(/\.[^/.]+$/, "");
     const groupKey = cleanName.includes('-') ? cleanName.split('-')[0].trim() : cleanName;
 
-    if (!groupsMap[groupKey]) groupsMap[groupKey] = [];
-    groupsMap[groupKey].push(f);
+    if (!groupsMap[groupKey]) {
+      groupsMap[groupKey] = { files: [], isNew: false };
+    }
+    groupsMap[groupKey].files.push(f);
+
+    // 檢查是否在 7 天內更新過
+    if (f.modifiedTime) {
+      const modifiedDate = new Date(f.modifiedTime);
+      if ((now - modifiedDate) <= ONE_WEEK_MS) {
+        groupsMap[groupKey].isNew = true;
+      }
+    }
   });
 
   let html = '';
-  // 依照群組名稱重新排序，確保 01 一定在 011 前面
-  const sortedGroups = Object.entries(groupsMap).sort((a, b) => naturalSort(a[0], b[0]));
-  for (const [groupName, groupFiles] of sortedGroups) {
+  for (const [groupName, groupData] of Object.entries(groupsMap)) {
+    const groupFiles = groupData.files;
     const photoCountText = groupFiles.length > 1 ? `<span>${groupFiles.length} 張照片</span>` : '';
+    const newBadge = groupData.isNew ? `<span class="badge-new">NEW</span>` : '';
     
     html += `
       <article class="group">
         <div class="group-title">
-          <div>${escapeHtml(groupName)}</div>
+          <div class="group-title-left">
+            <span>${escapeHtml(groupName)}</span>
+            ${newBadge}
+          </div>
           ${photoCountText}
         </div>
         <div class="subphotos">
@@ -386,49 +415,6 @@ function renderPhotosGrid(files) {
   }
 
   document.getElementById('groups').innerHTML = html;
-}
-
-<div class="head">
-  <div class="head-row">
-    <div>
-      <h2 id="title">載入中...</h2>
-      <p id="subtitle">請稍候</p>
-    </div>
-  </div>
-</div>
-
-<!-- TXT 說明備註區 -->
-<div id="textBlock" class="text-block empty"></div>
-<div id="groups" class="groups"></div>
-
-index.html [generated with file_gen tool]
-  
-// 自然數字排序：01、02、...、09、010、011、012...
-// 同時支援像 01-6、02-1 這類名稱。
-function naturalSort(a, b) {
-  const partsA = String(a).match(/\d+|\D+/g) || [];
-  const partsB = String(b).match(/\d+|\D+/g) || [];
-  const len = Math.min(partsA.length, partsB.length);
-
-  for (let i = 0; i < len; i++) {
-    const pa = partsA[i];
-    const pb = partsB[i];
-    const na = /^\d+$/.test(pa);
-    const nb = /^\d+$/.test(pb);
-
-    if (na && nb) {
-      const diff = Number(pa) - Number(pb);
-      if (diff !== 0) return diff;
-    } else {
-      const diff = pa.localeCompare(pb, 'zh-Hant', {
-        sensitivity: 'base',
-        numeric: false
-      });
-      if (diff !== 0) return diff;
-    }
-  }
-
-  return partsA.length - partsB.length;
 }
 
 function openLightbox(url) {
