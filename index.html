@@ -47,20 +47,17 @@ button,input,textarea,select{font:inherit} button{cursor:pointer}
 
 .groups{display:flex;flex-direction:column;gap:24px}.group{background:#fff;border:1px solid var(--border);border-radius:18px;padding:20px}
 .group-title{font-weight:800;font-size:18px;margin-bottom:16px;color:var(--primary);display:flex;align-items:center;justify-content:space-between}
-.group-title-left { display: flex; align-items: center; gap: 10px; }
-.group-title span{font-size:13px;color:var(--muted);font-weight:500}
+.group-title span.count{font-size:13px;color:var(--muted);font-weight:500}
 
-/* NEW 標籤樣式 */
+/* 柔和輕量化的 NEW 標籤（無刺眼紅底） */
 .badge-new {
-  background: #e53e3e;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 999px;
+  color: #e53e3e;
+  font-size: 14px;
+  font-weight: 800;
+  margin-left: 6px;
   letter-spacing: 0.5px;
   display: inline-block;
-  vertical-align: middle;
+  vertical-align: baseline;
 }
 
 .subphotos{display:flex;flex-direction:column;gap:20px;width:100%}
@@ -210,7 +207,6 @@ function initOAuth() {
 }
 
 window.onload = function() {
-  // 完整等待 google.accounts.oauth2 載入完成
   let checkGapi = setInterval(() => {
     if (window.google && google.accounts && google.accounts.oauth2) {
       clearInterval(checkGapi);
@@ -257,7 +253,6 @@ async function fetchSubFolders() {
     const data = await res.json();
     dataFolders = data.files || [];
     
-    // 自然數字排序資料夾清單
     dataFolders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
     if (dataFolders.length > 0) {
@@ -358,7 +353,6 @@ function renderPhotosGrid(files) {
     return;
   }
 
-  // 套用自然數字排序 (01, 02... 10, 11)
   files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   const groupsMap = {};
@@ -374,7 +368,6 @@ function renderPhotosGrid(files) {
     }
     groupsMap[groupKey].files.push(f);
 
-    // 檢查是否在 7 天內更新過
     if (f.modifiedTime) {
       const modifiedDate = new Date(f.modifiedTime);
       if ((now - modifiedDate) <= ONE_WEEK_MS) {
@@ -386,16 +379,13 @@ function renderPhotosGrid(files) {
   let html = '';
   for (const [groupName, groupData] of Object.entries(groupsMap)) {
     const groupFiles = groupData.files;
-    const photoCountText = groupFiles.length > 1 ? `<span>${groupFiles.length} 張照片</span>` : '';
+    const photoCountText = groupFiles.length > 1 ? `<span class="count">${groupFiles.length} 張照片</span>` : '';
     const newBadge = groupData.isNew ? `<span class="badge-new">NEW</span>` : '';
     
     html += `
       <article class="group">
         <div class="group-title">
-          <div class="group-title-left">
-            <span>${escapeHtml(groupName)}</span>
-            ${newBadge}
-          </div>
+          <div>${escapeHtml(groupName)}${newBadge}</div>
           ${photoCountText}
         </div>
         <div class="subphotos">
