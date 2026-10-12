@@ -388,6 +388,19 @@ function renderPhotosGrid(files) {
   document.getElementById('groups').innerHTML = html;
 }
 
+<div class="head">
+  <div class="head-row">
+    <div>
+      <h2 id="title">載入中...</h2>
+      <p id="subtitle">請稍候</p>
+    </div>
+  </div>
+</div>
+
+<!-- TXT 說明備註區 -->
+<div id="textBlock" class="text-block empty"></div>
+<div id="groups" class="groups"></div>
+  
 // 自然數字排序：01、02、...、09、010、011、012...
 // 同時支援像 01-6、02-1 這類名稱。
 function naturalSort(a, b) {
